@@ -157,6 +157,33 @@ int luacwrap_type_set_reference(lua_State *L, int ud, int value, int offset)
 //////////////////////////////////////////////////////////////////////////
 /**
 
+  Remove a reference within environment of managed object to a
+  pointer referenced value.
+
+*////////////////////////////////////////////////////////////////////////
+int luacwrap_type_remove_reference(lua_State *L, int ud, int offset)
+{
+  LUASTACK_SET(L);
+  
+  // get environment
+  lua_getfenv(L, ud);
+  if (!lua_isnil(L, -1))
+  {
+    // env[offset] = nil
+    lua_pushnil(L);
+    lua_rawseti(L, -2, offset);
+
+    // pop environment table
+    lua_pop(L, 1);
+  }
+
+  LUASTACK_CLEAN(L, 0);
+  return 0;
+}
+
+//////////////////////////////////////////////////////////////////////////
+/**
+
   copy reference table from source object to destination object
 
 *////////////////////////////////////////////////////////////////////////
@@ -532,7 +559,7 @@ static int luacwrap_type_tostring(lua_State* L, int ud, int offset, luacwrap_Typ
 
         lua_getglobal(L, "tostring");
 
-        lua_getfield(L, LUA_GLOBALSINDEX, "table");
+        lua_getglobal(L, "table");
         lua_getfield(L, -1, "concat");
         // remove "table"
         lua_remove(L, -2);
@@ -582,7 +609,7 @@ static int luacwrap_type_tostring(lua_State* L, int ud, int offset, luacwrap_Typ
         lua_remove(L, -2);
 
         // string.gsub(res, "%z", "\\0")
-        lua_getfield(L, LUA_GLOBALSINDEX, "string");
+        lua_getglobal(L, "string");
         lua_getfield(L, -1, "gsub");
         lua_remove(L, -2);
 
@@ -1232,9 +1259,9 @@ luaL_reg g_mtBoxed[ ] = {
   @return pointer to raw object memory
 
 *////////////////////////////////////////////////////////////////////////
-LUACWRAP_API void* luacwrap_pushboxedobj( lua_State*            L
-                                        , luacwrap_Type*        desc
-                                        , int                   initval)
+void* luacwrap_pushboxedobj( lua_State*            L
+                           , luacwrap_Type*        desc
+                           , int                   initval)
 {
   size_t udsize;
   void* ud;
@@ -1418,9 +1445,9 @@ static int luacwrap_getouter(lua_State* L, int ud, int* offset)
   check a userdata type descriptor against a given type descriptor
 
 *////////////////////////////////////////////////////////////////////////
-LUACWRAP_API  void* luacwrap_checktype   ( lua_State*          L
-                                         , int                 ud
-                                         , luacwrap_Type*      desc)
+void* luacwrap_checktype   ( lua_State*          L
+                           , int                 ud
+                           , luacwrap_Type*      desc)
 {
   luacwrap_Type* uddesc;
   int offset;
@@ -1450,7 +1477,7 @@ LUACWRAP_API  void* luacwrap_checktype   ( lua_State*          L
   push a typed pointer to a not garbage collected object
 
 *////////////////////////////////////////////////////////////////////////
-LUACWRAP_API int luacwrap_pushtypedptr(lua_State* L, luacwrap_Type* desc, void* pObj)
+int luacwrap_pushtypedptr(lua_State* L, luacwrap_Type* desc, void* pObj)
 {
   int result = 0;
   LUASTACK_SET(L);
@@ -1788,7 +1815,7 @@ luaL_reg g_mtDynTypeCtors[ ] = {
   @param[in]  desc    basic type descriptor
 
 */////////////////////////////////////////////////////////////////////////
-LUACWRAP_API int luacwrap_registerbasictype(lua_State* L, luacwrap_BasicType* desc)
+int luacwrap_registerbasictype(lua_State* L, luacwrap_BasicType* desc)
 {
   LUASTACK_SET(L);
 
@@ -1848,7 +1875,7 @@ LUACWRAP_API int luacwrap_registerbasictype(lua_State* L, luacwrap_BasicType* de
   @param[in]  index   stack index
 
 *////////////////////////////////////////////////////////////////////////
-LUACWRAP_API int luacwrap_createreference(lua_State* L, int index)
+int luacwrap_createreference(lua_State* L, int index)
 {
   int ref;
   int validx = abs_index(L, index);
@@ -1878,7 +1905,7 @@ LUACWRAP_API int luacwrap_createreference(lua_State* L, int index)
   @param[in]  L       lua state
 
 *////////////////////////////////////////////////////////////////////////
-LUACWRAP_API int luacwrap_release_reference(lua_State *L)
+int luacwrap_release_reference(lua_State *L)
 {
   int* pref = luacwrap_toreference(L, 1);
 
@@ -1970,7 +1997,7 @@ luaL_reg g_mtReferences[ ] = {
   @param[in]  reference reference index
 
 *////////////////////////////////////////////////////////////////////////
-LUACWRAP_API int luacwrap_pushreference(lua_State* L, int reference)
+int luacwrap_pushreference(lua_State* L, int reference)
 {
   int* ud;
 
@@ -2025,7 +2052,6 @@ static int* luacwrap_toreference(lua_State* L, int index)
 *////////////////////////////////////////////////////////////////////////
 static int luacwrap_pointer_set(luacwrap_BasicType* self, lua_State *L, PBYTE pData, int offset)
 {
-  int    setReference = 0;
   PBYTE* v = (PBYTE*)pData;
 
   switch (lua_type(L, -1))
@@ -2033,19 +2059,35 @@ static int luacwrap_pointer_set(luacwrap_BasicType* self, lua_State *L, PBYTE pD
     case LUA_TLIGHTUSERDATA:
     case LUA_TUSERDATA:
       {
-        setReference = 1;
         *v = (PBYTE)lua_touserdata(L, -1);
+        
+        if (*v)
+        {
+          // store reference in outer value
+          luacwrap_type_set_reference(L, 1, abs_index(L, -1), offset);
+        }
+        else
+        {
+          // remove a possible reference value (from a previously assigned value)
+          luacwrap_type_remove_reference(L, 1, offset);
+        }
       }
       break;
     case LUA_TSTRING:
       {
-        setReference = 1;
         *v = (PBYTE)lua_tostring(L, -1);
+
+        // store reference in outer value
+        luacwrap_type_set_reference(L, 1, abs_index(L, -1), offset);
       }
       break;
     case LUA_TNUMBER:
+    case LUA_TNIL:
       {
         *v = (PBYTE)lua_tointeger(L, -1);
+        
+        // remove a possible reference value (from a previously assigned value)
+        luacwrap_type_remove_reference(L, 1, offset);
       }
       break;
     default:
@@ -2053,12 +2095,6 @@ static int luacwrap_pointer_set(luacwrap_BasicType* self, lua_State *L, PBYTE pD
         luaL_error(L, "userdata, string or number expected, got %s", luaL_typename(L, 4));
       }
       break;
-  }
-
-  if (setReference)
-  {
-    // store reference in outer value
-    luacwrap_type_set_reference(L, 1, abs_index(L, -1), offset);
   }
 
   return 0;
@@ -2079,7 +2115,14 @@ static int luacwrap_pointer_get(luacwrap_BasicType* self, lua_State *L, PBYTE pD
   {
     // otherwise return raw pointer as light userdata
     PBYTE* v = (PBYTE*)pData;
-    lua_pushlightuserdata(L, *v);
+    if (*v)
+    {
+      lua_pushlightuserdata(L, *v);
+    }
+    else
+    {
+      lua_pushnil(L);
+    }
   }
 
   return 1;
@@ -2170,7 +2213,7 @@ luacwrap_BasicType regType_Reference =
   @param[in]  desc          type descriptor
 
 */////////////////////////////////////////////////////////////////////////
-LUACWRAP_API int luacwrap_registertype( lua_State*       L
+int luacwrap_registertype( lua_State*       L
                          , int              nsidx
                          , luacwrap_Type*   desc)
 {
@@ -2592,6 +2635,19 @@ char* create_moduletable =
 "  end\n"
 "  return _M\n";
 
+static luacwrap_cinterface g_cinterface = 
+{
+  LUACWARP_CINTERFACE_VERSION,
+  luacwrap_registerbasictype,
+  luacwrap_registertype,
+  luacwrap_checktype,
+  luacwrap_pushtypedptr,
+  luacwrap_pushboxedobj,
+  luacwrap_createreference,
+  luacwrap_pushreference,
+  luacwrap_defuintconstants
+};
+  
 //////////////////////////////////////////////////////////////////////////
 /**
 
@@ -2693,6 +2749,23 @@ LUACWRAP_API int luaopen_luacwrap(lua_State *L)
 
     // register reference type
     luacwrap_registerbasictype(L, &regType_Reference);
+    
+    // register c interface
+    lua_pushlightuserdata(L, &g_cinterface);
+    lua_setfield(L, -2, LUACWARP_CINTERFACE_NAME);
+
+    // set info fields
+    lua_pushstring(L, "Klaus Oberhofer");
+    lua_setfield(L, -2, "_AUTHOR");
+
+    lua_pushstring(L, "1.1.0-1");
+    lua_setfield(L, -2, "_VERSION");
+
+    lua_pushstring(L, "MIT license: See LICENSE for details.");
+    lua_setfield(L, -2, "_LICENSE");
+
+    lua_pushstring(L, "https://github.com/oberhofer/luacwrap");
+    lua_setfield(L, -2, "_URL");
   }
 
   LUASTACK_CLEAN(L, 1);

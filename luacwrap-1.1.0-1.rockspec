@@ -1,11 +1,19 @@
+-- This file was automatically generated for the LuaDist project.
+
 package = "luacwrap"
 
-version = "scm-1"
+version = "1.1.0-1"
 
+-- LuaDist source
 source = {
-  url    = "git://github.com/oberhofer/luacwrap.git",
-  branch = "develop",
+  tag = "1.1.0-1",
+  url = "git://github.com/LuaDist-testing/luacwrap.git"
 }
+-- Original source
+-- source = {
+--   url    = "git://github.com/oberhofer/luacwrap.git",
+--   tag = "v1.1.0",
+-- }
 
 description = {
   summary = "LuaCwrap C structure wrapper.",
