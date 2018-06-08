@@ -2,17 +2,17 @@
 
 package = "luacwrap"
 
-version = "1.1.0-1"
+version = "1.2.0-1"
 
 -- LuaDist source
 source = {
-  tag = "1.1.0-1",
+  tag = "1.2.0-1",
   url = "git://github.com/LuaDist-testing/luacwrap.git"
 }
 -- Original source
 -- source = {
 --   url    = "git://github.com/oberhofer/luacwrap.git",
---   tag = "v1.1.0",
+--   tag = "v1.2.0",
 -- }
 
 description = {
@@ -29,7 +29,7 @@ description = {
 supported_platforms = { "linux", "windows" }
 
 dependencies = {
-  "lua == 5.1"
+  "lua >= 5.1"
 }
 
 local function make_plat(plat)
@@ -82,7 +82,7 @@ end
 
 build = {
   type = "builtin",
-  copy_directories = { "doc" },
+  copy_directories = { "doc", "include" },
   platforms = {
     linux   = make_plat("linux"),
     win32   = make_plat("win32"),
