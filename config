@@ -1,0 +1,60 @@
+#------
+# LuaCwrap makefile configuration
+#
+
+#------
+# Output file names
+#
+EXT=so
+
+LUACWRAP_MAJOR=1
+LUACWRAP_VERSION=$(LUACWRAP_MAJOR).0.1
+TESTLUACWRAP_VERSION=$(LUACWRAP_MAJOR).0.1
+
+LUACWRAP_LIBNAME=liblua5.1-luacwrap
+LUACWRAP_MNAME=$(LUACWRAP_LIBNAME).$(EXT).$(LUACWRAP_MAJOR)
+LUACWRAP_VNAME=$(LUACWRAP_LIBNAME).$(EXT).$(LUACWRAP_VERSION) 
+
+TESTLUACWRAP_LIBNAME=testluacwrap
+TESTLUACWRAP_MNAME=$(TESTLUACWRAP_LIBNAME).$(EXT).$(TESTLUACWRAP_MAJOR)
+
+#------
+# Lua includes and libraries
+#
+LUA_INCDIR=/usr/include/lua5.1
+LUACWRAP_INCDIR=../include
+
+#------
+# Top of your Lua installation
+# Relative paths will be inside the src tree
+#
+INSTALL_TOP_SHARE=/usr/local/share
+INSTALL_TOP_LIB=/usr/local/lib
+INSTALL_LUA_LIB=$(INSTALL_TOP_LIB)/lua/5.1
+
+INSTALL_DATA=cp
+INSTALL_EXEC=cp
+INSTALL_LINK=ln -f
+
+#------
+# Compiler and linker settings
+# for Mac OS X
+#
+#CC=gcc
+#DEF= -DLUASOCKET_DEBUG -DUNIX_HAS_SUN_LEN
+#CFLAGS= $(LUAINC) -I$(COMPAT) $(DEF) -pedantic -Wall -O2 -fno-common
+#LDFLAGS=-bundle -undefined dynamic_lookup
+#LD=export MACOSX_DEPLOYMENT_TARGET="10.3"; gcc
+
+#------
+# Compiler and linker settings
+# for Linux
+CC=gcc
+DEF=
+CFLAGS= -I$(LUA_INCDIR) -I$(LUACWRAP_INCDIR) $(DEF) -Wall -O2 -fpic
+LDFLAGS=-O -shared -fpic
+LD=gcc 
+
+#------
+# End of makefile configuration
+#
